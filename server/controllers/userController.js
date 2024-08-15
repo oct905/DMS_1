@@ -1,5 +1,6 @@
 const { User, EducationHistory } = require('../models');
 const { hash, compare } = require('../utils/bcrypt');
+const { idDateFormat } = require('../utils/dateFormat');
 const { signToken } = require('../utils/jwt');
 
 class UserController {
@@ -15,15 +16,16 @@ class UserController {
             }
             console.log(payload);
 
-            const user = await User.create(payload);
-            console.log(user);
+            await User.create(payload);
 
             res.status(201).json({
                 msg: 'User created successfully'
             });
         } catch (err) {
             console.log(err);
-            next(err)
+            next({
+                status: 401
+            })
         }
     }
     static async login(req, res, next) {
@@ -37,9 +39,9 @@ class UserController {
                     email
                 }
             });
-            if (!user) throw { status: "401" }
+            if (!user) throw { status: 401 }
 
-            if (!compare(password, user.password)) throw { status: "401" }
+            if (!compare(password, user.password)) throw { status: 401 }
 
             const payload = {
                 id: user.id,
@@ -52,7 +54,6 @@ class UserController {
                 token
             });
         } catch (err) {
-            console.log(err);
             next(err)
         }
     }
@@ -75,11 +76,17 @@ class UserController {
 
     static async getAll(req, res, next) {
         try {
-            const users = await User.findAll({ raw: true });
-
-            users.forEach(user => {
-                delete user.password
+            let users = await User.findAll({
+                attributes: {
+                    exclude: ['password', 'createdAt', 'updatedAt']
+                },
+                raw: true
             });
+
+            users = users.map((user) => {
+                user.birthDate = idDateFormat(user.birthDate)
+                return user
+            })
 
             res.status(200).json({
                 users
